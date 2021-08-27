@@ -46,41 +46,25 @@ enum {
     HTTP_TRACE,
     HTTP_PATCH
 };
-//
-//   H4AS_Request< T > + derivatives
-//
-template<typename T>
-class H4AS_Request: public H4AsyncClient {
+class H4AS_HTTPRequest: public H4AsyncClient {
     public:
-        T*          _server=nullptr;
-        H4AS_Request(tcp_pcb* p,T* server=nullptr): _server(server), H4AsyncClient(p){
-            H4AT_PRINT1("H4AS_Request CTOR %p pcb=%p srv=%p\n",this,p,server);
-            onRX([=](const uint8_t* data,size_t len){ process(data,len); });
-        }
-        virtual ~H4AS_Request(){ H4AT_PRINT1("H4AS_Request DTOR %p\n",this); }
-        virtual void            process(const uint8_t* data,size_t len)=0;
-};
-
-class H4AS_HTTPRequest: public H4AS_Request<H4AsyncWebServer> {
-    protected:
-        static  std::string     _getHeader(H4T_NVP_MAP& m,const char* h);
-                void            _paramsFromstring(const std::string& bod);
-    public:
-                std::string     url;
                 uint8_t*        _body=nullptr;
                 size_t          _blen=0;
-                H4T_NVP_MAP    params;
+                H4T_NVP_MAP     params;
+                std::string     url;
 
-        H4AS_HTTPRequest(tcp_pcb* p,H4AsyncWebServer* server): H4AS_Request<H4AsyncWebServer>(p,server){ H4AT_PRINT1("H4AS_HTTPRequest CTOR %p\n",this);}
+        H4AS_HTTPRequest(tcp_pcb* p): H4AsyncClient(p){ H4AT_PRINT1("H4AS_HTTPRequest CTOR %p\n",this);}
         virtual ~H4AS_HTTPRequest(){ 
-            Serial.printf("H4AS_HTTPRequest DTOR %p body=%p\n",this,_body);
+            H4AT_PRINT1("H4AS_HTTPRequest DTOR %p body=%p\n",this,_body);
             if(_body){
-                Serial.printf("H4AS_HTTPRequest DTOR %p body=%p\n",this,_body);
+                H4AT_PRINT1("H4AS_HTTPRequest DTOR %p body=%p\n",this,_body);
                 free(_body);
             }
         }
 
-        virtual void            process(const uint8_t* data,size_t len);
+// don't call
+        static  std::string     _getHeader(H4T_NVP_MAP& m,const char* h);
+                void            _paramsFromstring(const std::string& bod);
 };
 //
 //   H4AT_HTTPHandler + derivatives
@@ -94,13 +78,14 @@ class H4AT_HTTPHandler {
         virtual bool                _match(const std::string& verb,const std::string& path);
 
     public:
-            H4T_NVP_MAP            _headers; // hoist!
+                H4T_NVP_MAP         _headers; // hoist!
+                H4AsyncWebServer*   _srv;
 
                 std::string         _verbName();
                 int                 _verb;
                 std::string         _path;
                 H4AS_HTTPRequest*   _r=nullptr;
-                H4T_NVP_MAP         _sniffHeader;
+                H4T_NVP_MAP         _sniffHeader; // thinl: tidy??
 
         static  H4T_NVP_MAP         mimeTypes;
 
@@ -111,8 +96,6 @@ class H4AT_HTTPHandler {
             H4AT_PRINT1("H4AT_HTTPHandler DTOR %p\n",this);
             reset(); // prob don't need this
         }
-
-        inline  void                addCacheAge();
                 void                addHeader(const std::string& name,const std::string& value){ _headers[name]=value; }
                 uint8_t*            bodyData(){ return _r->_body; }
                 size_t              bodySize(){ return _r->_blen; } // tidy these
@@ -188,5 +171,7 @@ class H4AsyncWebServer: public H4AsyncServer {
 
         virtual void            reset();
 // don't call
-                void            _incoming(tcp_pcb* p) override;
+                H4AsyncClient* _instantiateRequest(struct tcp_pcb* p) override { return reinterpret_cast<H4AsyncClient*>(new H4AS_HTTPRequest(p)); }
+
+                void            route(void* c,const uint8_t* data,size_t len) override;
 };

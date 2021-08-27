@@ -85,41 +85,6 @@ void H4AS_HTTPRequest::_paramsFromstring(const std::string& bod){
         std::string value=nvp.size()==2 ? nvp[1]:"";
         params[nvp[0]]=urldecode(value);
     }
-//    #if H4AT_DEBUG
-//    for(auto &p:params) Serial.printf("PARAMS[%s]=%s\n",p.first.data(),p.second.data());
-//    #endif
-}
-
-void H4AS_HTTPRequest::process(const uint8_t* data,size_t len){
-    H4AT_PRINT1("process %p srv=%p\n",this,_server);
-    std::vector<std::string> rqst=split(std::string((const char*)data,len),"\r\n");
-    std::vector<std::string> sub=split(replaceAll(rqst[0],"HTTP/1.1",""),"?");
-    if(sub.size() > 1) _paramsFromstring(sub[1]);
-    std::vector<std::string> vparts=split(sub[0]," ");
-
-    H4T_NVP_MAP _rqHeaders;
-    for(auto &r:std::vector<std::string>(++rqst.begin(),--rqst.end())){
-        std::vector<std::string> rparts=split(r,":");
-        _rqHeaders[uppercase(rparts[0])]=trim(rparts[1]);
-    }
-//    for(auto &r:_rqHeaders) Serial.printf("RQ %s=%s\n",r.first.data(),r.second.data());
-
-    _blen=atoi(_getHeader(_rqHeaders,"Content-length").data());
-    if(_blen){ // refactor get
-        _body=static_cast<uint8_t*>(malloc(_blen));
-        memcpy(_body,data+len-_blen,_blen);
-        Serial.printf("SAVING BODY RQ=%p b=%p l=%d\n",this,_body,_blen);
-        if(_getHeader(_rqHeaders,"Content-type")=="application/x-www-form-urlencoded"){
-            std::string bod((const char*) _body,_blen);
-            _paramsFromstring(bod);
-        } else Serial.printf("received weird type %s\n",_getHeader(_rqHeaders,"Content-type").data());
-    }
-    //
-    H4AT_PRINT1("CNX %p PCB=%p RQ %s %s bod=%p bl=%d nP=%d chk %d _handlers\n",this,pcb,vparts[0].data(),vparts[1].data(),_body,_blen,params.size(),_server->_handlers.size());
-    for(auto h:_server->_handlers){
-        for(auto &s:h->_sniffHeader) if(_rqHeaders.count(uppercase(s.first))) h->_sniffHeader[s.first]=_rqHeaders[uppercase(s.first)];
-        if(h->_select(this,vparts[0],vparts[1])) break;
-    }
 }
 //
 // H4AT_HTTPHandler
@@ -142,24 +107,17 @@ bool H4AT_HTTPHandler::_select(H4AS_HTTPRequest* r,const std::string& verb,const
     _r=r;
     _r->url=urldecode(path);
     if(_match(verb,path)){
-//        Serial.printf("H4AT_HTTPHandler::_select <-- 0 %u\n",_HAL_freeHeap());
         bool rv=_execute();
         reset();
-//        Serial.printf("H4AT_HTTPHandler::_select --> 0 %u\n",_HAL_freeHeap());
         return rv;
     } else return false;
 }
 
 std::string H4AT_HTTPHandler::_verbName(){ return http_verb_names[_verb]; }
 
-void H4AT_HTTPHandler::addCacheAge(){ _headers["Cache-Control"]="max-age="+stringFromInt(_r->_server->_cacheAge); }
-
 void H4AT_HTTPHandler::reset(){
-    Serial.printf("H4AT_HTTPHandler::reset() %p _r=%p\n",this,_r);
+    H4AT_PRINT1("H4AT_HTTPHandler::reset() 1 %p _r=%p\n",this,_r);
     _headers.clear();
-    _sniffHeader.clear();
-    _r->params.clear();
-//    if(_r->_body) free(_r->_body);
 }
 
 void H4AT_HTTPHandler::send(uint16_t code,const std::string& type,size_t length,const void* _body){
@@ -199,7 +157,6 @@ bool H4AT_HTTPHandlerFile::_execute(){
     bool rv=false;
     char crlf[]={'0','\r','\n','\r','\n'};
     size_t force_fit=TCP_MSS - 7; // allow chunk embellishment not to overflow "sensible" buf size hex\r\n ... \r\n == 7
-//    Serial.printf("_execute <-- 0 %u\n",_HAL_freeHeap());
     readFileChunks(_path.data(),force_fit,
         [&](const uint8_t* data,size_t len){
             std::string hex=stringFromInt(len,"%03x\r\n");
@@ -212,8 +169,8 @@ bool H4AT_HTTPHandlerFile::_execute(){
             free(buff);
         },
         [&](size_t size){ 
-            addHeader("Transfer-Encoding","chunked");
-            addCacheAge();
+            _headers["Transfer-Encoding"]="chunked";
+            _headers["Cache-Control"]="max-age="+stringFromInt(_srv->_cacheAge);
             send(200,mimeType(_path),0,nullptr);
         },
         [&]{
@@ -222,7 +179,6 @@ bool H4AT_HTTPHandlerFile::_execute(){
             rv=true;
         }
     );
-//    Serial.printf("_execute --> 0 %u\n",_HAL_freeHeap());
     return rv;
 }
 //
@@ -239,31 +195,20 @@ bool H4AT_HTTPHandler404::_execute() {
 H4AT_HTTPHandlerSSE::H4AT_HTTPHandlerSSE(const std::string& url, size_t backlog,uint32_t timeout):
     _timeout(timeout),
     _bs(backlog),
-    H4AT_HTTPHandler(HTTP_GET,url) {
-        Serial.printf("SSE HANDLER CTOR %p backlog=%d timeout=%d\n",this,_bs,_timeout);
-//        _sniffHeader["last-event-id"]="";
-}
+    H4AT_HTTPHandler(HTTP_GET,url) { H4AT_PRINT1("SSE HANDLER CTOR %p backlog=%d timeout=%d\n",this,_bs,_timeout); }
 
 H4AT_HTTPHandlerSSE::~H4AT_HTTPHandlerSSE(){
-    Serial.printf("SSE HANDLER DTOR %p\n",this);
-    reset();
+    H4AT_PRINT1("SSE HANDLER DTOR %p\n",this);
+//    reset();
 }
 
 bool H4AT_HTTPHandlerSSE::_execute(){
     _clients.insert(_r);
     auto c=_r;
-    Serial.printf("SSE EXE %p\n",c);
     c->onDisconnect([=](){
-        dumpClients();
         _clients.erase(c);
-        Serial.printf("SSE DCX %p LEAVES %d clients\n",c,_clients.size());
-        dumpClients();
         if(!_clients.size()) {
-            Serial.printf("%p PRE-CLOSE state A:\n",this);
-            Serial.printf("c=%p nH=%d snif=%d BL=%d id=%d\n",c,_headers.size(),_sniffHeader.size(),_backlog.size(),_nextID);            
             reset();
-            Serial.printf("%p PRE-CLOSE state B:\n",this);
-            Serial.printf("c=%p nH=%d snif=%d BL=%d id=%d\n",c,_headers.size(),_sniffHeader.size(),_backlog.size(),_nextID);            
             _cbConnect(0); // notify all gone
         }
     });
@@ -275,7 +220,7 @@ bool H4AT_HTTPHandlerSSE::_execute(){
             if(b.first > lid) c->TX((const uint8_t *) b.second.data(),b.second.size());
         }
     } else H4AT_PRINT1("New SSE Client %p\n",c);
-    addHeader("Cache-Control","no-cache");
+    _headers["Cache-Control"]="no-cache";
     H4AT_HTTPHandler::send(200,"text/event-stream",0,nullptr); // explicitly send zero!
     h4.queueFunction([=]{ 
         H4AT_PRINT1("SSE CLIENT %p set timeout %d\n",c,_timeout);
@@ -289,16 +234,16 @@ bool H4AT_HTTPHandlerSSE::_execute(){
 }
 
 void H4AT_HTTPHandlerSSE::reset() { 
-    Serial.printf("%p H4AT_HTTPHandlerSSE::reset 1\n",this);
-    H4AT_HTTPHandler::reset();
-    Serial.printf("%p H4AT_HTTPHandlerSSE::reset 2\n",this);
-    _backlog.clear();
-    Serial.printf("%p H4AT_HTTPHandlerSSE::reset 3\n",this);
-    for(auto &c:_clients) c->_lastSeen=0;
-    Serial.printf("%p H4AT_HTTPHandlerSSE::reset 4\n",this);
+    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 1\n",this);
     h4.cancelSingleton(H4AS_SSE_KA_ID); // needed ?
-    Serial.printf("%p H4AT_HTTPHandlerSSE::reset 5\n",this);
+    H4AT_HTTPHandler::reset();
+    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 2\n",this);
+    _backlog.clear();
+    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 4\n",this);
+    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 5\n",this);
     _nextID=0;
+    _sniffHeader["last-event-id"]=""; // AND CTOR?
+    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 6\n",this);
 }
 
 void H4AT_HTTPHandlerSSE::saveBacklog(const std::string& m){
@@ -322,9 +267,6 @@ void H4AT_HTTPHandlerSSE::send(const std::string& message, const std::string& ev
         for(auto &d:data) rv+="data: "+d+"\n";
     }
     rv+="\n";
-    for(auto &c:_clients) {
-        Serial.printf("c=%p closing=%d\n",c,c->_closing);
-        c->TX((const uint8_t *) rv.data(),rv.size());
-    }
+    for(auto &c:_clients) c->TX((const uint8_t *) rv.data(),rv.size());
     if(_bs) saveBacklog(rv);
 }
