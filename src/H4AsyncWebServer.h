@@ -99,19 +99,22 @@ class H4AT_HTTPHandler {
                 void                addHeader(const std::string& name,const std::string& value){ _headers[name]=value; }
                 uint8_t*            bodyData(){ return _r->_body; }
                 size_t              bodySize(){ return _r->_blen; } // tidy these
-        static  std::string         mimeType(const std::string& fn);
+        static  std::string         mimeType(const char* fn);
         virtual void                reset();
         virtual void                send(uint16_t code,const std::string& type,size_t length=0,const void* _body=nullptr);
-        virtual void                sendFile(const std::string& fn);
+        virtual void                sendFile(const char* fn){ _serveFile(fn); }
+        virtual void                sendFileParams(const char* fn,H4T_FN_LOOKUP f);
         virtual void                sendstring(const std::string& type,const std::string& data){ send(200,type,data.size(),(const void*) data.data()); }
                 std::string         url(){ return _r->url; } // tidy these
 //      don't call
                 bool                _select(H4AS_HTTPRequest* r,const std::string& verb,const std::string& path);
+                bool                _serveFile(const char* fn);
+                bool                _notFound();
 };
 
 class H4AT_HTTPHandlerFile: public H4AT_HTTPHandler {
     protected:
-        virtual bool    _execute() override;
+        virtual bool    _execute() override { return _serveFile(_path.data()); }
         virtual bool    _match(const std::string& verb,const std::string& path) override;
     public:
         H4AT_HTTPHandlerFile(): H4AT_HTTPHandler(HTTP_GET,"*"){};
@@ -120,7 +123,7 @@ class H4AT_HTTPHandlerFile: public H4AT_HTTPHandler {
 
 class H4AT_HTTPHandler404: public H4AT_HTTPHandler {
     protected:
-        virtual bool    _execute() override;
+        virtual bool    _execute() override { return _notFound(); }
         virtual bool    _match(const std::string& verb,const std::string& path) override { return true; }
     public:
         H4AT_HTTPHandler404(): H4AT_HTTPHandler(HTTP_ANY,"404"){}

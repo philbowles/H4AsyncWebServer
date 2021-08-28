@@ -1,10 +1,6 @@
-import socket
-import time 
-import sys 
+import socket 
  
-import argparse 
- 
-host = '192.168.1.245' 
+host = '192.168.1.244' 
  
 def echo_client(port): 
     """ A simple echo client """ 
@@ -18,19 +14,16 @@ def echo_client(port):
     # Send data 
     try: 
         # Send data 
-        message = "GET /Go0.jpg HTTP/1.1\r\nHost: 192.168.1.20\r\n\r\n"
- 
+        message = "Test message. This will be echoed" 
         print ("Sending %s" % message) 
-        sock.sendall(message.encode('utf-8'))
-        time.sleep(10)
+        sock.sendall(message.encode('utf-8')) 
         # Look for the response 
-        
-#        amount_received = 0 
-#        amount_expected = len(message) 
-#        while amount_received < amount_expected: 
-#            data = sock.recv(128) 
-#            amount_received += len(data) 
-#            print ("Received: %s" % data) 
+        amount_received = 0 
+        amount_expected = len(message) 
+        while amount_received < amount_expected: 
+            data = sock.recv(128) 
+            amount_received += len(data) 
+            print ("Received: %s" % data) 
     except socket.error as e: 
         print ("Socket error: %s" %str(e)) 
     except Exception as e: 
@@ -40,4 +33,4 @@ def echo_client(port):
         sock.close() 
      
 if __name__ == '__main__': 
-    echo_client(80) 
+    echo_client(8080) 

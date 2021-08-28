@@ -41,10 +41,10 @@ std::vector<std::string> wisdom={
   "Support me on Patreon! <div class=\"lnk\"><a href=\"https://patreon.com/esparto\" rel=\"noopener\" target=\"_blank\"><img src=\"/patreon.jpg\"></image></a></div></div>",
   "Never put off till tomorrow what will keep till the day after",
   "There is no problem so big you can't walk away from it",
-  "Money cannot buy happiness, but its more comfortable to cry in a Mercedse than on a bicycle",
-  "Frogive your enemy, but remember the bastard's name",
+  "Money cannot buy happiness, but its more comfortable to cry in a Mercedes than on a bicycle",
+  "Forgive your enemy, but remember the bastard's name",
   "Help someone when they are in trouble, and they will rememeber you when they are in trouble again",
-  "It is better to stay silent and be thought a foll, than to opne one's mouth and immediately removve all doubt",
+  "It is better to stay silent and be thought a fool, than to open one's mouth and immediately remove all doubt",
   "Many people are alive today only because it's illegal to shoot them",
   "Alcohol does not solve any problems, but neither does milk"
 };

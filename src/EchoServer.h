@@ -29,20 +29,20 @@ philbowles2012@gmail.com
 No warranties are given. The license may not give you all of the permissions necessary for your intended use. 
 For example, other rights such as publicity, privacy, or moral rights may limit how you use the material.
 */
-#include <H4AsyncWebServer.h>
-
-class EchoServer;
-
-class EchoRequest: public H4AS_Request<EchoServer> {
-    public:
-        EchoRequest(tcp_pcb* p,EchoServer* server): H4AS_Request<EchoServer>(p,server){}
-        
-        void        process(const uint8_t* data,size_t len) override { TX(data,len); }
-};
+#include <H4AsyncTCP.h>
 
 class EchoServer: public H4AsyncServer {
   public:
     EchoServer(uint16_t port): H4AsyncServer(port){}
 
-    void _incoming(tcp_pcb* p) override { newConnection(p,new EchoRequest(p,this)); }
+        void            route(void* c,const uint8_t* data,size_t len) override { 
+            Serial.printf("ECHO ROUTE %p %p %d\n",c,data,len);
+            reinterpret_cast<H4AsyncClient*>(c)->TX(data,len);
+        };
+// don't call!  
+        H4AsyncClient*  _instantiateRequest(struct tcp_pcb *p){
+            auto c=new H4AsyncClient(p);
+            Serial.printf("ECHO INSTANTIATE %p %p\n",c,p);
+            return c;
+        };
 };

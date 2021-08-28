@@ -44,7 +44,7 @@ H4_INT_MAP http_verb_names = { // tidy
     {HTTP_PATCH,"PATCH"}
 };
 
-H4_INT_MAP H4AT_HTTPHandler::_responseCodes{
+H4_INT_MAP H4AT_HTTPHandler::_responseCodes{ // lose this?
     {100,"Continue"},
     {101,"Switching Protocols"},
     {200,"OK"},
@@ -54,7 +54,9 @@ H4_INT_MAP H4AT_HTTPHandler::_responseCodes{
     {403,"Forbidden"},
     {404,"Not Found"},
     {408,"Request Time-out"},
+    {413,"Payload Too Large"}, 
     {415,"Unsupported Media Type"},
+    {429,"Too many requests"},
     {500,"Internal Server Error"},
     {503,"Service Unavailable"}
 };
@@ -90,9 +92,7 @@ void H4AS_HTTPRequest::_paramsFromstring(const std::string& bod){
 // H4AT_HTTPHandler
 //
 bool H4AT_HTTPHandler::_execute(){
-//    Serial.printf("H4AT_HTTPHandler::_execute <-- 0 %u\n",_HAL_freeHeap());
     if(_f) _f(this);
-//    Serial.printf("H4AT_HTTPHandler::_execute --> 0 %u\n",_HAL_freeHeap());
     return true;
 }
 
@@ -103,9 +103,15 @@ bool H4AT_HTTPHandler::_match(const std::string& verb,const std::string& path){
     } else return false;
 }
 
+bool H4AT_HTTPHandler::_notFound(){
+    send(404,"text/plain",5,"oops!");
+    return true;
+}
+
 bool H4AT_HTTPHandler::_select(H4AS_HTTPRequest* r,const std::string& verb,const std::string& path){
     _r=r;
     _r->url=urldecode(path);
+    H4AT_PRINT2("Handler select rq=%p url=%s  v=%s[%s] p=%s[%s]\n",_r,_r->url.data(),_verbName().data(),verb.data(),_path.data(),path.data());
     if(_match(verb,path)){
         bool rv=_execute();
         reset();
@@ -113,7 +119,44 @@ bool H4AT_HTTPHandler::_select(H4AS_HTTPRequest* r,const std::string& verb,const
     } else return false;
 }
 
+bool H4AT_HTTPHandler::_serveFile(const char* fn){
+    H4AT_PRINT2("Serve file %s\n",fn);
+    bool rv=false;
+    char crlf[]={'0','\r','\n','\r','\n'};
+    size_t force_fit=TCP_MSS - 7; // allow chunk embellishment not to overflow "sensible" buf size hex\r\n ... \r\n == 7
+    readFileChunks(fn,force_fit,
+        [&](const uint8_t* data,size_t len){
+            std::string hex=stringFromInt(len,"%03x\r\n");
+            size_t total=len+hex.size()+2;
+            uint8_t* buff=static_cast<uint8_t*>(malloc(total));
+            memcpy(buff,hex.data(),hex.size());
+            memcpy(buff+hex.size(),data,len);
+            memcpy(buff+hex.size()+len,&crlf[3],2);
+            _r->TX(buff,total);
+            free(buff);
+        },
+        [&](size_t size){
+            if(size){
+                _headers["Transfer-Encoding"]="chunked";
+                _headers["Cache-Control"]="max-age="+stringFromInt(_srv->_cacheAge);
+                send(200,mimeType(fn),0,nullptr);
+            } else _notFound();//send(404,"text/plain",5,"oops!");
+        },
+        [&]{
+            H4AT_PRINT1("ALL CHUNKED OUT for %s\n",_path.data());
+            _r->TX((const uint8_t*) crlf,5);
+            rv=true;
+        }
+    );
+    return rv;
+}
 std::string H4AT_HTTPHandler::_verbName(){ return http_verb_names[_verb]; }
+
+std::string H4AT_HTTPHandler::mimeType(const char* f){
+    std::string fn(f);
+    std::string e = fn.substr(fn.rfind('.')+1);
+    return mimeTypes.count(e) ? mimeTypes[e]:"text/plain";
+}
 
 void H4AT_HTTPHandler::reset(){
     H4AT_PRINT1("H4AT_HTTPHandler::reset() 1 %p _r=%p\n",this,_r);
@@ -139,11 +182,8 @@ void H4AT_HTTPHandler::send(uint16_t code,const std::string& type,size_t length,
     } else Serial.printf("AAAAAAAAARGH H4AT_HTTPHandler::send zero buff\n");
 }
 
-void H4AT_HTTPHandler::sendFile(const std::string& fn){ }//H4AT_HTTPHandlerFile::serveFile(this,fn); }
-
-std::string H4AT_HTTPHandler::mimeType(const std::string& fn){
-    std::string e = fn.substr(fn.rfind('.')+1);
-    return mimeTypes.count(e) ? mimeTypes[e]:"text/plain";
+void H4AT_HTTPHandler::sendFileParams(const char* fn,H4T_FN_LOOKUP f){
+    sendstring(mimeType(fn), replaceParams(readFile(fn),f));
 }
 //
 // H4AT_HTTPHandlerFile match only verb, treat path as static filename
@@ -151,43 +191,6 @@ std::string H4AT_HTTPHandler::mimeType(const std::string& fn){
 bool H4AT_HTTPHandlerFile::_match(const std::string& verb,const std::string& path) {
     _path=path;
     return verb==_verbName();
-}
-
-bool H4AT_HTTPHandlerFile::_execute(){
-    bool rv=false;
-    char crlf[]={'0','\r','\n','\r','\n'};
-    size_t force_fit=TCP_MSS - 7; // allow chunk embellishment not to overflow "sensible" buf size hex\r\n ... \r\n == 7
-    readFileChunks(_path.data(),force_fit,
-        [&](const uint8_t* data,size_t len){
-            std::string hex=stringFromInt(len,"%03x\r\n");
-            size_t total=len+hex.size()+2;
-            uint8_t* buff=static_cast<uint8_t*>(malloc(total));
-            memcpy(buff,hex.data(),hex.size());
-            memcpy(buff+hex.size(),data,len);
-            memcpy(buff+hex.size()+len,&crlf[3],2);
-            _r->TX(buff,total);
-            free(buff);
-        },
-        [&](size_t size){ 
-            _headers["Transfer-Encoding"]="chunked";
-            _headers["Cache-Control"]="max-age="+stringFromInt(_srv->_cacheAge);
-            send(200,mimeType(_path),0,nullptr);
-        },
-        [&]{
-            H4AT_PRINT1("ALL CHUNKED OUT for %s\n",_path.data());
-            _r->TX((const uint8_t*) crlf,5);
-            rv=true;
-        }
-    );
-    return rv;
-}
-//
-// H4AT_HTTPHandler404 match anything 
-//
-bool H4AT_HTTPHandler404::_execute() {
-    H4AT_PRINT1("SENDING 404\n");
-    send(404,"text/plain",5,"oops!");
-    return true; 
 }
 //
 // H4AT_HTTPHandlerSSE
@@ -197,9 +200,7 @@ H4AT_HTTPHandlerSSE::H4AT_HTTPHandlerSSE(const std::string& url, size_t backlog,
     _bs(backlog),
     H4AT_HTTPHandler(HTTP_GET,url) { H4AT_PRINT1("SSE HANDLER CTOR %p backlog=%d timeout=%d\n",this,_bs,_timeout); }
 
-H4AT_HTTPHandlerSSE::~H4AT_HTTPHandlerSSE(){
-    H4AT_PRINT1("SSE HANDLER DTOR %p\n",this);
-//    reset();
+H4AT_HTTPHandlerSSE::~H4AT_HTTPHandlerSSE(){ H4AT_PRINT1("SSE HANDLER DTOR %p\n",this);
 }
 
 bool H4AT_HTTPHandlerSSE::_execute(){
@@ -208,6 +209,7 @@ bool H4AT_HTTPHandlerSSE::_execute(){
     c->onDisconnect([=](){
         _clients.erase(c);
         if(!_clients.size()) {
+            h4.cancelSingleton(H4AS_SSE_KA_ID); // needed ?
             reset();
             _cbConnect(0); // notify all gone
         }
@@ -235,15 +237,14 @@ bool H4AT_HTTPHandlerSSE::_execute(){
 
 void H4AT_HTTPHandlerSSE::reset() { 
     H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 1\n",this);
-    h4.cancelSingleton(H4AS_SSE_KA_ID); // needed ?
     H4AT_HTTPHandler::reset();
-    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 2\n",this);
+//    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 2\n",this);
     _backlog.clear();
-    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 4\n",this);
-    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 5\n",this);
+//    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 4\n",this);
+//    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 5\n",this);
     _nextID=0;
     _sniffHeader["last-event-id"]=""; // AND CTOR?
-    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 6\n",this);
+//    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 6\n",this);
 }
 
 void H4AT_HTTPHandlerSSE::saveBacklog(const std::string& m){

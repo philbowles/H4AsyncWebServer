@@ -32,7 +32,7 @@ For example, other rights such as publicity, privacy, or moral rights may limit 
 #include<H4AsyncWebServer.h>
 
 void H4AsyncWebServer::addDefaultHandlers(){
-//    H4AT_PRINT1("H4AsyncWebServer::addDefaultHandlers\n");
+    H4AT_PRINT1("H4AsyncWebServer::addDefaultHandlers\n");
     _handlers.push_back(new H4AT_HTTPHandlerFile());
     _handlers.push_back(new H4AT_HTTPHandler404());
 }
@@ -40,6 +40,7 @@ void H4AsyncWebServer::addDefaultHandlers(){
 void H4AsyncWebServer::begin(){
 //    H4AT_PRINT1("BEGIN %p\n",this);
     H4AsyncServer::begin();
+    addDefaultHandlers();
     onError([=](int e,int i){ Serial.printf("H4AsyncWebServer ERROR %d %d\n",e,i); });
 }
 
@@ -69,7 +70,7 @@ void H4AsyncWebServer::route(void* c,const uint8_t* data,size_t len){
         std::vector<std::string> rparts=split(r,":");
         _rqHeaders[uppercase(rparts[0])]=trim(rparts[1]);
     }
-    //for(auto &r:_rqHeaders) Serial.printf("RQ %s=%s\n",r.first.data(),r.second.data());
+//    for(auto &r:_rqHeaders) Serial.printf("RQ %s=%s\n",r.first.data(),r.second.data());
 
     r->_blen=atoi(r->_getHeader(_rqHeaders,"Content-length").data());
     if(r->_blen){ // refactor get
