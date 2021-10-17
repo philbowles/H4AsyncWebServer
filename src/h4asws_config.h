@@ -29,7 +29,16 @@ philbowles2012@gmail.com
 No warranties are given. The license may not give you all of the permissions necessary for your intended use. 
 For example, other rights such as publicity, privacy, or moral rights may limit how you use the material.
 */
-#define H4ASWS_VERSION  "0.0.1"
+#define H4AS_VERSION  "0.0.1"
+/*
+    Debug levels: 
+    0 - No debug messages, no debug functions
+    1 - Debug functions compiled in + CNX / DCX messages
+    2 - TX / RX / ACK messages
+
+    4 - a lot
+*/
+#define H4AS_DEBUG 0
 
 #define H4AS_CACHE_AGE 31536000
 // defult Cache Control value to send for file assets

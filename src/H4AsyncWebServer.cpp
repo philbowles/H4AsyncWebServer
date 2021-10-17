@@ -31,36 +31,40 @@ For example, other rights such as publicity, privacy, or moral rights may limit 
 */
 #include<H4AsyncWebServer.h>
 
-void H4AsyncWebServer::addDefaultHandlers(){
-    H4AT_PRINT1("H4AsyncWebServer::addDefaultHandlers\n");
-    _handlers.push_back(new H4AT_HTTPHandlerFile());
-    _handlers.push_back(new H4AT_HTTPHandler404());
+void H4AsyncWebServer::addHandler(H4AT_HTTPHandler* h){ 
+    h->_init(this); 
+    _handlers.push_back(h);
 }
 
 void H4AsyncWebServer::begin(){
-//    H4AT_PRINT1("BEGIN %p\n",this);
+    H4AS_PRINT1("SERVER BEGIN %p\n",this);
+    onError([=](int e,int i){ 
+        if(e!=ERR_CLSD) Serial.printf("H4AsyncWebServer ERROR %d %d\n",e,i);
+        return true;
+    });
+    H4AsyncClient::_scavenge();
+    addHandler(new H4AT_HTTPHandlerFile);
+    addHandler(new H4AT_HTTPHandler404);
     H4AsyncServer::begin();
-    addDefaultHandlers();
-    onError([=](int e,int i){ Serial.printf("H4AsyncWebServer ERROR %d %d\n",e,i); });
 }
 
-void H4AsyncWebServer::on(const char* path,int verb,H4AS_RQ_HANDLER f){_handlers.push_back(new H4AT_HTTPHandler{verb,path,f}); }
+void H4AsyncWebServer::on(const char* path,int verb,H4AS_RQ_HANDLER f){ addHandler(new H4AT_HTTPHandler{verb,path,f}); }
 
 void H4AsyncWebServer::reset(){
-//    H4AT_PRINT1("H4AsyncWebServer::reset()\n");
+    H4AS_PRINT1("H4AsyncWebServer::reset()\n");
     for(auto &h:_handlers){
-        H4AT_PRINT1("reset handler %s %s\n",h->_verbName().data(),h->_path.data());
+        H4AS_PRINT1("reset handler %s %s\n",h->_verbName().data(),h->_path.data());
         h->reset();
         delete h;
     }
     _handlers.clear();
-//    H4AT_PRINT1("H4AsyncWebServer::reset() handlers cleared\n");
+    H4AS_PRINT1("H4AsyncWebServer::reset() handlers cleared\n");
 }
 
 void H4AsyncWebServer::route(void* c,const uint8_t* data,size_t len){
     auto r=reinterpret_cast<H4AS_HTTPRequest*>(c);
     std::vector<std::string> rqst=split(std::string((const char*)data,len),"\r\n");
-    Serial.printf("%p ROUTE %s data=%p len=%d\n",r,rqst[0].data(),data,len);
+    H4AS_PRINT1("%p ROUTE %s data=%p len=%d\n",r,rqst[0].data(),data,len);
     std::vector<std::string> sub=split(replaceAll(rqst[0],"HTTP/1.1",""),"?");
     if(sub.size() > 1) r->_paramsFromstring(sub[1]);
     std::vector<std::string> vparts=split(sub[0]," ");
@@ -70,9 +74,8 @@ void H4AsyncWebServer::route(void* c,const uint8_t* data,size_t len){
         std::vector<std::string> rparts=split(r,":");
         _rqHeaders[uppercase(rparts[0])]=trim(rparts[1]);
     }
-//    for(auto &r:_rqHeaders) Serial.printf("RQ %s=%s\n",r.first.data(),r.second.data());
-
-    r->_blen=atoi(r->_getHeader(_rqHeaders,"Content-length").data());
+//        for(auto &r:_rqHeaders) Serial.printf("RQ %s=%s\n",r.first.data(),r.second.data());
+    r->_blen=atoi(r->_getHeader(_rqHeaders,txtContentLength()).data());
     if(r->_blen){ // refactor get
         r->_body=static_cast<uint8_t*>(malloc(r->_blen));
         memcpy(r->_body,data+len-r->_blen,r->_blen);
@@ -83,10 +86,8 @@ void H4AsyncWebServer::route(void* c,const uint8_t* data,size_t len){
         } else Serial.printf("received weird type %s\n",r->_getHeader(_rqHeaders,"Content-type").data());
     }
     //
-//    H4AT_PRINT1("CNX %p PCB=%p RQ %s %s bod=%p bl=%d nP=%d chk %d _handlers\n",this,pcb,vparts[0].data(),vparts[1].data(),_body,_blen,params.size(),_server->_handlers.size());
     for(auto h:_handlers){
         for(auto &s:h->_sniffHeader) if(_rqHeaders.count(uppercase(s.first))) h->_sniffHeader[s.first]=_rqHeaders[uppercase(s.first)];
-        h->_srv=this;
         if(h->_select(r,vparts[0],vparts[1])) break;
     }
 }

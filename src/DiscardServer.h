@@ -31,13 +31,13 @@ For example, other rights such as publicity, privacy, or moral rights may limit 
 */
 #include <H4AsyncTCP.h>
 
-class EchoServer: public H4AsyncServer {
+class DiscardServer: public H4AsyncServer {
   public:
-    EchoServer(uint16_t port): H4AsyncServer(port){}
+    DiscardServer(uint16_t port): H4AsyncServer(port){}
 
-        void            route(void* c,const uint8_t* data,size_t len) override { reinterpret_cast<H4AsyncClient*>(c)->TX(data,len); };
-// don't call!
-/* 
+        void            route(void* c,const uint8_t* data,size_t len) override {};
+// don't call!  
+/*
         H4AsyncClient*  _instantiateRequest(struct tcp_pcb *p){
             auto c=new H4AsyncClient(p);
             return c;

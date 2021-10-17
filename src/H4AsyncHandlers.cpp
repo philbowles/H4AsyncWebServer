@@ -88,6 +88,10 @@ void H4AS_HTTPRequest::_paramsFromstring(const std::string& bod){
         params[nvp[0]]=urldecode(value);
     }
 }
+
+void H4AS_HTTPRequest::sendText(const std::string& s){ H4AT_HTTPHandlerWS::_sendFrame(this,WS_TEXT,(const uint8_t*) s.data(),s.size()); }
+
+void H4AS_HTTPRequest::sendBinary(const uint8_t* data,size_t len){ H4AT_HTTPHandlerWS::_sendFrame(this,WS_BINARY,data,len); }
 //
 // H4AT_HTTPHandler
 //
@@ -111,7 +115,7 @@ bool H4AT_HTTPHandler::_notFound(){
 bool H4AT_HTTPHandler::_select(H4AS_HTTPRequest* r,const std::string& verb,const std::string& path){
     _r=r;
     _r->url=urldecode(path);
-    H4AT_PRINT2("Handler select rq=%p url=%s  v=%s[%s] p=%s[%s]\n",_r,_r->url.data(),_verbName().data(),verb.data(),_path.data(),path.data());
+    H4AS_PRINT1("Handler select rq=%p url=%s  v=%s[%s] p=%s[%s]\n",_r,_r->url.data(),_verbName().data(),verb.data(),_path.data(),path.data());
     if(_match(verb,path)){
         bool rv=_execute();
         reset();
@@ -120,7 +124,7 @@ bool H4AT_HTTPHandler::_select(H4AS_HTTPRequest* r,const std::string& verb,const
 }
 
 bool H4AT_HTTPHandler::_serveFile(const char* fn){
-    H4AT_PRINT2("Serve file %s\n",fn);
+    H4AS_PRINT2("Serve file %s\n",fn);
     bool rv=false;
     char crlf[]={'0','\r','\n','\r','\n'};
     size_t force_fit=TCP_MSS - 7; // allow chunk embellishment not to overflow "sensible" buf size hex\r\n ... \r\n == 7
@@ -143,13 +147,14 @@ bool H4AT_HTTPHandler::_serveFile(const char* fn){
             } else _notFound();//send(404,"text/plain",5,"oops!");
         },
         [&]{
-            H4AT_PRINT1("ALL CHUNKED OUT for %s\n",_path.data());
+            H4AS_PRINT1("ALL CHUNKED OUT for %s\n",_path.data());
             _r->TX((const uint8_t*) crlf,5);
             rv=true;
         }
     );
     return rv;
 }
+
 std::string H4AT_HTTPHandler::_verbName(){ return http_verb_names[_verb]; }
 
 std::string H4AT_HTTPHandler::mimeType(const char* f){
@@ -159,15 +164,15 @@ std::string H4AT_HTTPHandler::mimeType(const char* f){
 }
 
 void H4AT_HTTPHandler::reset(){
-    H4AT_PRINT1("H4AT_HTTPHandler::reset() 1 %p _r=%p\n",this,_r);
+    H4AS_PRINT1("H4AT_HTTPHandler::reset() 1 %p _r=%p\n",this,_r);
     _headers.clear();
 }
 
 void H4AT_HTTPHandler::send(uint16_t code,const std::string& type,size_t length,const void* _body){
-    H4AT_PRINT2("H4AT_HTTPHandler %p send(%d,%s,%d,%p)\n",this,code,type.data(),length,_body);
+    H4AS_PRINT2("H4AT_HTTPHandler %p send(%d,%s,%d,%p)\n",this,code,type.data(),length,_body);
     std::string status=std::string("HTTP/1.1 ")+stringFromInt(code,"%3d ").append(_responseCodes[code])+"\r\n";
     _headers["Content-Type"]=type;
-    if(length) _headers["Content-Length"]=stringFromInt(length);
+    if(length) _headers[txtContentLength()]=stringFromInt(length);
     for(auto const& h:_headers) status+=h.first+": "+h.second+"\r\n";
     status+="\r\n";
     //
@@ -191,83 +196,4 @@ void H4AT_HTTPHandler::sendFileParams(const char* fn,H4T_FN_LOOKUP f){
 bool H4AT_HTTPHandlerFile::_match(const std::string& verb,const std::string& path) {
     _path=path;
     return verb==_verbName();
-}
-//
-// H4AT_HTTPHandlerSSE
-//
-H4AT_HTTPHandlerSSE::H4AT_HTTPHandlerSSE(const std::string& url, size_t backlog,uint32_t timeout):
-    _timeout(timeout),
-    _bs(backlog),
-    H4AT_HTTPHandler(HTTP_GET,url) { H4AT_PRINT1("SSE HANDLER CTOR %p backlog=%d timeout=%d\n",this,_bs,_timeout); }
-
-H4AT_HTTPHandlerSSE::~H4AT_HTTPHandlerSSE(){ H4AT_PRINT1("SSE HANDLER DTOR %p\n",this);
-}
-
-bool H4AT_HTTPHandlerSSE::_execute(){
-    _clients.insert(_r);
-    auto c=_r;
-    c->onDisconnect([=](){
-        _clients.erase(c);
-        if(!_clients.size()) {
-            h4.cancelSingleton(H4AS_SSE_KA_ID); // needed ?
-            reset();
-            _cbConnect(0); // notify all gone
-        }
-    });
-//    dumpClients();
-    auto lid=atoi(_sniffHeader["last-event-id"].data());
-    if(lid){
-        H4AT_PRINT3("It's a reconnect! lid=%d\n",lid);
-        for(auto b:_backlog){
-            if(b.first > lid) c->TX((const uint8_t *) b.second.data(),b.second.size());
-        }
-    } else H4AT_PRINT1("New SSE Client %p\n",c);
-    _headers["Cache-Control"]="no-cache";
-    H4AT_HTTPHandler::send(200,"text/event-stream",0,nullptr); // explicitly send zero!
-    h4.queueFunction([=]{ 
-        H4AT_PRINT1("SSE CLIENT %p set timeout %d\n",c,_timeout);
-        std::string retry("retry: ");
-        retry.append(stringFromInt(_timeout)).append("\n\n");
-        c->TX((const uint8_t *) retry.data(),retry.size());
-        _cbConnect(_clients.size());
-    });
-    h4.every((_timeout * 2) / 3,[=]{ send(":"); },nullptr,H4AS_SSE_KA_ID,true); // name it
-    return true;
-}
-
-void H4AT_HTTPHandlerSSE::reset() { 
-    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 1\n",this);
-    H4AT_HTTPHandler::reset();
-//    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 2\n",this);
-    _backlog.clear();
-//    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 4\n",this);
-//    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 5\n",this);
-    _nextID=0;
-    _sniffHeader["last-event-id"]=""; // AND CTOR?
-//    H4AT_PRINT1("%p H4AT_HTTPHandlerSSE::reset 6\n",this);
-}
-
-void H4AT_HTTPHandlerSSE::saveBacklog(const std::string& m){
-    _backlog[_nextID]=m;
-    if(_backlog.size() > _bs) _backlog.erase(_nextID - _bs);
-}
-
-void H4AT_HTTPHandlerSSE::send(const std::string& message, const std::string& event){
-    char buf[16];
-    std::string rv;
-    if(message[0]==':') rv=message+"\n";
-    else {
-        rv.append("id: ").append(itoa(++_nextID,buf,10)).append("\n");
-        if(event.size()) rv+="event: "+event+"\n";
-        std::vector<std::string> data;
-        char *token = strtok(const_cast<char*>(message.data()), "\n");
-        while (token != nullptr){
-            data.push_back(std::string(token));
-            token = strtok(nullptr, "\n");
-        }
-        for(auto &d:data) rv+="data: "+d+"\n";
-    }
-    rv+="\n";
-    for(auto &c:_clients) c->TX((const uint8_t *) rv.data(),rv.size());
-    if(_bs) saveBacklog(rv);
 }

@@ -1,0 +1,46 @@
+<!DOCTYPE HTML>
+<html>
+   <head>
+      <script type = "text/javascript">
+
+         function WebSocketTest() {
+               document.getElementById("msg").innerHTML="Opening connection...";
+				   ws = new WebSocket("ws://"+document.location.host+"/ws");
+
+               ws.onopen = function() { 
+                  ws.send("Hello there!");
+                  document.getElementById("msg").innerHTML="Connection open";
+               };
+				
+               ws.onmessage = function (evt) {
+                  let parts=evt.data.split(",");
+                  let ele=document.getElementById(parts[0]);
+                  if(ele) ele.innerHTML=parts[1];
+                  else document.getElementById("msg").innerHTML=parts[1];
+               };
+				
+               ws.onclose = function() { 
+                  document.getElementById("msg").innerHTML="Connection closed";
+               };
+         }
+         
+      </script>
+		
+   </head>
+   
+   <body onload="WebSocketTest()">
+      <center>
+         <div>WEBSOCKET TESTER</div>
+         <table>
+            <tr><td>Lib</td><td id="lib"></td></h2></tr>
+            <tr><td>Board</td><td id="board"></td></h2></tr>
+            <tr><td>Millis</td><td id="millis"></td></tr>
+            <tr><td>Heap</td><td id="heap"></td></tr>
+            <tr><td>Max Block</td><td id="mhb"></td></tr>
+            <tr><td>Random</td><td id="rnd"></td></h2></tr>
+            <tr><td>No Clients</td><td id="n"></td></h2></tr>
+            <tr><td>Msg</td><td id="msg"></td></tr>
+         </table>
+      </center>
+   </body>
+</html>
