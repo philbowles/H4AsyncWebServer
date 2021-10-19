@@ -63,6 +63,7 @@ void H4AsyncWebServer::reset(){
 
 void H4AsyncWebServer::route(void* c,const uint8_t* data,size_t len){
     auto r=reinterpret_cast<H4AS_HTTPRequest*>(c);
+
     std::vector<std::string> rqst=split(std::string((const char*)data,len),"\r\n");
     H4AS_PRINT1("%p ROUTE %s data=%p len=%d\n",r,rqst[0].data(),data,len);
     std::vector<std::string> sub=split(replaceAll(rqst[0],"HTTP/1.1",""),"?");
@@ -72,18 +73,18 @@ void H4AsyncWebServer::route(void* c,const uint8_t* data,size_t len){
     H4T_NVP_MAP _rqHeaders;
     for(auto &r:std::vector<std::string>(++rqst.begin(),--rqst.end())){
         std::vector<std::string> rparts=split(r,":");
-        _rqHeaders[uppercase(rparts[0])]=trim(rparts[1]);
+        if(rparts.size() > 1) _rqHeaders[uppercase(rparts[0])]=urldecode(trim(rparts[1]));
     }
-//        for(auto &r:_rqHeaders) Serial.printf("RQ %s=%s\n",r.first.data(),r.second.data());
+        
+//    for(auto &r:_rqHeaders) Serial.printf("RQ %s=%s\n",r.first.data(),r.second.data());
+
     r->_blen=atoi(r->_getHeader(_rqHeaders,txtContentLength()).data());
     if(r->_blen){ // refactor get
         r->_body=static_cast<uint8_t*>(malloc(r->_blen));
         memcpy(r->_body,data+len-r->_blen,r->_blen);
-        //Serial.printf("SAVING BODY RQ=%p b=%p l=%d\n",r,r->_body,r->_blen);
-        if(r->_getHeader(_rqHeaders,"Content-type")=="application/x-www-form-urlencoded"){
-            std::string bod((const char*) r->_body,r->_blen);
-            r->_paramsFromstring(bod);
-        } else Serial.printf("received weird type %s\n",r->_getHeader(_rqHeaders,"Content-type").data());
+//        Serial.printf("SAVING BODY RQ=%p b=%p l=%d\n",r,r->_body,r->_blen);
+        if(r->_getHeader(_rqHeaders,"Content-type")=="application/x-www-form-urlencoded") r->_paramsFromstring(std::string ((const char*) r->_body,r->_blen));
+        else Serial.printf("received weird type %s\n",r->_getHeader(_rqHeaders,"Content-type").data());
     }
     //
     for(auto h:_handlers){

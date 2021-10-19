@@ -147,10 +147,14 @@ class H4AT_HTTPHandler {
                 uint8_t*            bodyData(){ return _r->_body; }
                 size_t              bodySize(){ return _r->_blen; } // tidy these
         static  std::string         mimeType(const char* fn);
+                H4T_NVP_MAP&        params(){ return _r->params; }
+                void                redirect(const char* fn);
         virtual void                reset();
         virtual void                send(uint16_t code,const std::string& type,size_t length=0,const void* _body=nullptr);
         virtual void                sendFile(const char* fn){ _serveFile(fn); }
         virtual void                sendFileParams(const char* fn,H4T_FN_LOOKUP f);
+                void                sendOK(){ send(200,mimeType("txt"),0,nullptr); }
+                // send404?
         virtual void                sendstring(const std::string& type,const std::string& data){ send(200,type,data.size(),(const void*) data.data()); }
                 std::string         url(){ return _r->url; } // tidy these
 //      don't call

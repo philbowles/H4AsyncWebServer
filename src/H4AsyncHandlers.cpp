@@ -48,6 +48,7 @@ H4_INT_MAP H4AT_HTTPHandler::_responseCodes{ // lose this?
     {100,"Continue"},
     {101,"Switching Protocols"},
     {200,"OK"},
+    {303,"See Other"},
     {304,"Not Modified"},
     {400,"Bad Request"},
     {401,"Unauthorized"},
@@ -108,7 +109,7 @@ bool H4AT_HTTPHandler::_match(const std::string& verb,const std::string& path){
 }
 
 bool H4AT_HTTPHandler::_notFound(){
-    send(404,"text/plain",5,"oops!");
+    send(404,mimeType("txt"),5,"oops!");
     return true;
 }
 
@@ -161,6 +162,12 @@ std::string H4AT_HTTPHandler::mimeType(const char* f){
     std::string fn(f);
     std::string e = fn.substr(fn.rfind('.')+1);
     return mimeTypes.count(e) ? mimeTypes[e]:"text/plain";
+}
+
+void H4AT_HTTPHandler::redirect(const char* location){
+    H4AS_PRINT1("H4AT_HTTPHandler::redirect -> %s\n",location);
+    addHeader("Location",location);
+    send(303,mimeType("txt"),0,nullptr); // tidy this (et al) : no mimetype when length == 0!
 }
 
 void H4AT_HTTPHandler::reset(){

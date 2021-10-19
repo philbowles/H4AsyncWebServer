@@ -1,6 +1,6 @@
 import socket 
  
-host = '192.168.1.244' 
+host = '192.168.1.245' 
  
 def echo_client(port): 
     """ A simple echo client """ 
@@ -33,4 +33,4 @@ def echo_client(port):
         sock.close() 
      
 if __name__ == '__main__': 
-    echo_client(8080) 
+    echo_client(8007) 

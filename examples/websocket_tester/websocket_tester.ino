@@ -38,7 +38,7 @@ void h4setup(){
   _ws=new H4AT_HTTPHandlerWS("/ws");
   _ws->onOpen([](H4AS_HTTPRequest* skt){
     h4.queueFunction([skt,_ws]{ 
-      skt->sendText("lib,%s",LIB);
+      skt->sendText("lib,%s/%s",LIB,H4AT_VERSION);
       skt->sendText("board,%s",MY_BOARD);
       skt->sendText("default,You are No. %d",_ws->size());
     });
@@ -49,9 +49,6 @@ void h4setup(){
       _ws->broadcastText("rnd1,%u",random(0,1000));
       _ws->broadcastText("rnd2,%u",random(0,2000));
       _ws->broadcastText("rnd3,%u",random(0,3000));
-      _ws->broadcastText("rnd4,%u",random(0,4000));
-      _ws->broadcastText("rnd5,%u",random(0,5000));
-      _ws->broadcastText("rnd6,%u",random(0,6000));
       _ws->broadcastText("n,%d",_ws->size());
     });
   });
@@ -60,13 +57,12 @@ void h4setup(){
     // normally you would parse the message and probably do a big
     // switch statement to perform a different function for each different message type
     // In this simple example, we only have the one type
-    if(msg=="mark") skt->sendText("rnd1,#0a0");
-    else Serial.printf("We got us a client! %p\n",skt);
+    skt->sendText(msg+" sent by user");
   });
   
   _ws->onClose([](H4AS_HTTPRequest* skt){ if(!_ws->size()) h4.cancel(ticker); });
 
-  s.on("/",HTTP_GET,[](H4AT_HTTPHandler* h){ h->sendFile("ws.htm"); });   
+  s.on("/",HTTP_GET,[](H4AT_HTTPHandler* h){ h->sendFile("index.htm"); });   
   s.addHandler(_ws);  
   s.begin();
 }

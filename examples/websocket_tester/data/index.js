@@ -32,17 +32,13 @@ class graph{
 		this.ticks=ticks;
 		this.dp=dp;		
 		var g=document.getElementById(ele);
-		var c=this.ctx=g.getContext("2d");
+		this.ctx=g.getContext("2d");
 		this.height=g.height;
 		this.width=g.width;
+		this.lastv=0;
 		this.nPoints=this.width/base;
 		this.points=[];
-		this.strikes=[];
 		for(var i=0;i<this.nPoints;i++)	this.points[i]=0;		
-	}
-	
-	strike(c){
-		this.strikes.push({c: c, n: this.width});	
 	}
 	
 	norm(v){
@@ -51,6 +47,9 @@ class graph{
 	}
 
 	plot(v){
+		var c=this.ctx;
+		c.strokeStyle="#00f";		
+		
 		this.points.shift();
 		this.points.push(v);
 		
@@ -85,19 +84,7 @@ class graph{
 		c.fillStyle="#f00";
 		c.font = '8px sans-serif';
 		c.fillText(avg.toFixed(this.dp),this.width / 2 ,this.norm(avg) - 3);
-		
-		for(var i=0;i<this.strikes.length;i++){
-			this.strikes[i].n-=slide;
-			if(this.strikes[i].n<slide) this.strikes.shift();
-			else {
-				c.beginPath();		
-					c.strokeStyle=this.strikes[i].c;
-					c.moveTo(this.strikes[i].n,0);
-					c.lineTo(this.strikes[i].n,this.height);
-				c.stroke();						
-			}
-		}
-	}				
+	}
 }
 
 function dgsDiv(c,t,i,hang){
@@ -150,6 +137,7 @@ function doMsg(m){	document.getElementById("msg").innerHTML=m; }
 
 function sendUser(){
 	ws.send(document.getElementById("user").value)
+	grf.strike(42)
 }
 document.addEventListener("DOMContentLoaded", function() {
 	doGraph("R1");
