@@ -52,9 +52,9 @@ std::vector<std::string> wisdom={
 class RandomQuoteServer: public H4AsyncWebServer {
   public:
     RandomQuoteServer(uint16_t port): H4AsyncWebServer(port){
-        on("/",HTTP_GET,[=](H4AT_HTTPHandler* h){
+        on("/",HTTP_GET,[=](H4AW_HTTPHandler* h){
             std::string html="<HTML><BODY><CENTER><H1>"+wisdom[random(0,wisdom.size())]+"</H1></CENTER></BODY></HTML>";
-            h->sendstring(H4AT_HTTPHandler::mimeTypes["htm"],html);
+            h->sendstring(H4AW_HTTPHandler::mimeTypes["htm"],html);
         });
     }
 };

@@ -29,7 +29,7 @@ philbowles2012@gmail.com
 No warranties are given. The license may not give you all of the permissions necessary for your intended use. 
 For example, other rights such as publicity, privacy, or moral rights may limit how you use the material.
 */
-#define H4AS_VERSION  "0.0.1"
+#define H4AW_VERSION  "0.0.1"
 /*
     Debug levels: 
     0 - No debug messages, no debug functions
@@ -38,7 +38,7 @@ For example, other rights such as publicity, privacy, or moral rights may limit 
 
     4 - a lot
 */
-#define H4AS_DEBUG 0
+#define H4AW_DEBUG 0
 
-#define H4AS_CACHE_AGE 31536000
+#define H4AW_CACHE_AGE 31536000
 // defult Cache Control value to send for file assets

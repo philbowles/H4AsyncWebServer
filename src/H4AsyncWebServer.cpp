@@ -31,41 +31,41 @@ For example, other rights such as publicity, privacy, or moral rights may limit 
 */
 #include<H4AsyncWebServer.h>
 
-void H4AsyncWebServer::addHandler(H4AT_HTTPHandler* h){ 
+void H4AsyncWebServer::addHandler(H4AW_HTTPHandler* h){ 
     h->_init(this); 
     _handlers.push_back(h);
 }
 
 void H4AsyncWebServer::begin(){
-    H4AS_PRINT1("SERVER BEGIN %p\n",this);
+    H4AW_PRINT1("SERVER BEGIN %p\n",this);
     onError([=](int e,int i){ 
         if(e!=ERR_CLSD) Serial.printf("H4AsyncWebServer ERROR %d %d\n",e,i);
         return true;
     });
     H4AsyncClient::_scavenge();
-    addHandler(new H4AT_HTTPHandlerFile);
-    addHandler(new H4AT_HTTPHandler404);
+    addHandler(new H4AW_HTTPHandlerFile);
+    addHandler(new H4AW_HTTPHandler404);
     H4AsyncServer::begin();
 }
 
-void H4AsyncWebServer::on(const char* path,int verb,H4AS_RQ_HANDLER f){ addHandler(new H4AT_HTTPHandler{verb,path,f}); }
+void H4AsyncWebServer::on(const char* path,int verb,H4AW_RQ_HANDLER f){ addHandler(new H4AW_HTTPHandler{verb,path,f}); }
 
 void H4AsyncWebServer::reset(){
-    H4AS_PRINT1("H4AsyncWebServer::reset()\n");
+    H4AW_PRINT1("H4AsyncWebServer::reset()\n");
     for(auto &h:_handlers){
-        H4AS_PRINT1("reset handler %s %s\n",h->_verbName().data(),h->_path.data());
-        h->reset();
+        H4AW_PRINT1("reset handler %s %s\n",h->_verbName().data(),h->_path.data());
+        h->_reset();
         delete h;
     }
     _handlers.clear();
-    H4AS_PRINT1("H4AsyncWebServer::reset() handlers cleared\n");
+    H4AW_PRINT1("H4AsyncWebServer::reset() handlers cleared\n");
 }
 
 void H4AsyncWebServer::route(void* c,const uint8_t* data,size_t len){
-    auto r=reinterpret_cast<H4AS_HTTPRequest*>(c);
+    auto r=reinterpret_cast<H4AW_HTTPRequest*>(c);
 
     std::vector<std::string> rqst=split(std::string((const char*)data,len),"\r\n");
-    H4AS_PRINT1("%p ROUTE %s data=%p len=%d\n",r,rqst[0].data(),data,len);
+    H4AW_PRINT1("%p ROUTE %s data=%p len=%d\n",r,rqst[0].data(),data,len);
     std::vector<std::string> sub=split(replaceAll(rqst[0],"HTTP/1.1",""),"?");
     if(sub.size() > 1) r->_paramsFromstring(sub[1]);
     std::vector<std::string> vparts=split(sub[0]," ");

@@ -18,7 +18,7 @@ H4 h4(115200);
   
 #include<H4AsyncWebServer.h>
 H4AsyncWebServer s(80);
-H4AT_HTTPHandlerSSE* _evts=nullptr;
+H4AW_HTTPHandlerSSE* _evts=nullptr;
 #define LIB "H4AsyncTCP"
 H4AT_NVP_MAP replacers={
     {"device",DEVICE}
@@ -42,7 +42,7 @@ void h4setup(){
 
   Serial.printf("Cry 'Havoc!' and let receive the packets of War!\n\n");
 
-  _evts=new H4AT_HTTPHandlerSSE("/evt");//,10); // backlog = 10
+  _evts=new H4AW_HTTPHandlerSSE("/evt");//,10); // backlog = 10
   _evts->onConnect([=](size_t nClients){
       Serial.printf("_evts->onConnect N=%d\n",nClients);
       if(nClients){
@@ -76,7 +76,7 @@ void h4setup(){
       }
   });
 
-  s.on("/",HTTP_GET,[](H4AT_HTTPHandler* h){
+  s.on("/",HTTP_GET,[](H4AW_HTTPHandler* h){
     h->sendFileParams("/sta.htm",lookup); // refac
   });   
 

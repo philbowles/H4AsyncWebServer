@@ -36,12 +36,12 @@ void h4setup(){
 
   Serial.printf("Cry 'Havoc!' and let receive the packets of War!\n\n");
 
-  s.on("/",HTTP_GET,[](H4AT_HTTPHandler* h){
-    h->sendFile("/sta.htm"); // refac
+  s.on("/",HTTP_GET,[](H4AW_HTTPHandler* h){
+    h->sendFile("/sta.htm");
   });   
   
-  s.on("/form",HTTP_POST,[](H4AT_HTTPHandler* h){
-    Serial.printf("FORM DATA RECEIVED! URL=%s\n",h->url().data());
+  s.on("/form",HTTP_POST,[](H4AW_HTTPHandler* h){
+    Serial.printf("FORM from %s URL=%s\n",h->client()->remoteIPstring().data(),h->url().data());
     for(auto const& p:h->params()) Serial.printf("Param %s=%s\n",p.first.data(),p.second.data());
     Serial.printf("BODY DATA\n");
     dumphex(h->bodyData(),h->bodySize());

@@ -67,10 +67,10 @@ void onEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventTyp
 
 
 
-  _ws->onTextMessage([](H4AS_HTTPRequest* skt,const std::string& s){
+  _ws->onTextMessage([](H4AW_HTTPRequest* skt,const std::string& s){
     // Do stuff with string s
   });
 
-  _ws->onBinaryMessage([](H4AS_HTTPRequest* skt,const uint8_t* data, size_t len){
+  _ws->onBinaryMessage([](H4AW_HTTPRequest* skt,const uint8_t* data, size_t len){
     // Do stuff with binary data/len
   });

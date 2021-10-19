@@ -31,36 +31,34 @@ For example, other rights such as publicity, privacy, or moral rights may limit 
 */
 #include<H4AsyncWebServer.h>
 
-H4AT_HTTPHandlerSSE::H4AT_HTTPHandlerSSE(const std::string& url, size_t backlog): _bs(backlog),H4AT_HTTPHandler(HTTP_GET,url) { 
-    H4AS_PRINT1("SSE HANDLER CTOR %p backlog=%d\n",this,_bs);
-    reset();
+H4AW_HTTPHandlerSSE::H4AW_HTTPHandlerSSE(const std::string& url, size_t backlog): _bs(backlog),H4AW_HTTPHandler(HTTP_GET,url) { 
+    H4AW_PRINT1("SSE HANDLER CTOR %p backlog=%d\n",this,_bs);
+    _reset();
 }
 
-H4AT_HTTPHandlerSSE::~H4AT_HTTPHandlerSSE(){ H4AS_PRINT1("SSE HANDLER DTOR %p\n",this); }
+H4AW_HTTPHandlerSSE::~H4AW_HTTPHandlerSSE(){ H4AW_PRINT1("SSE HANDLER DTOR %p\n",this); }
 
-bool H4AT_HTTPHandlerSSE::_execute(){
+bool H4AW_HTTPHandlerSSE::_execute(){
     _clients.insert(_r);
     auto c=_r;
     c->onDisconnect([=](){
         _clients.erase(c);
         if(!_clients.size()) {
             h4.cancelSingleton(H4AS_SSE_KA_ID); // needed ?
-            reset();
+            _reset();
             _cbConnect(0); // notify all gone
         }
     });
 //    dumpClients();
     auto lid=atoi(_sniffHeader["last-event-id"].data());
     if(lid){
-        H4AS_PRINT3("It's a reconnect! lid=%d\n",lid);
-        for(auto b:_backlog){
-            if(b.first > lid) c->TX((const uint8_t *) b.second.data(),b.second.size());
-        }
-    } else H4AS_PRINT1("New SSE Client %p\n",c);
+        H4AW_PRINT3("It's a reconnect! lid=%d send backlog of %d\n",lid,backlog.size());
+        for(auto b:_backlog) if(b.first > lid) c->TX((const uint8_t *) b.second.data(),b.second.size());
+    } else H4AW_PRINT1("New SSE Client %p\n",c);
     _headers["Cache-Control"]="no-cache";
-    H4AT_HTTPHandler::send(200,"text/event-stream",0,nullptr); // explicitly send zero!
+    H4AW_HTTPHandler::send(200,"text/event-stream",0,nullptr); // explicitly send zero!
     h4.queueFunction([=]{ 
-        H4AS_PRINT1("SSE CLIENT %p\n",c);
+        H4AW_PRINT1("SSE CLIENT %p\n",c);
         std::string retry("retry: ");
         retry.append(stringFromInt(H4AS_SCAVENGE_FREQ)).append("\n\n");
         c->TX((const uint8_t *) retry.data(),retry.size());
@@ -70,20 +68,20 @@ bool H4AT_HTTPHandlerSSE::_execute(){
     return true;
 }
 
-void H4AT_HTTPHandlerSSE::reset() { 
-    H4AS_PRINT1("%p H4AT_HTTPHandlerSSE::reset 1\n",this);
-    H4AT_HTTPHandler::reset();
+void H4AW_HTTPHandlerSSE::_reset() { 
+    H4AW_PRINT1("%p H4AW_HTTPHandlerSSE::reset 1\n",this);
+    H4AW_HTTPHandler::_reset();
     _backlog.clear();
     _nextID=0;
     _sniffHeader["last-event-id"]=""; // AND CTOR?
 }
 
-void H4AT_HTTPHandlerSSE::saveBacklog(const std::string& m){
+void H4AW_HTTPHandlerSSE::saveBacklog(const std::string& m){
     _backlog[_nextID]=m;
     if(_backlog.size() > _bs) _backlog.erase(_nextID - _bs);
 }
 
-void H4AT_HTTPHandlerSSE::send(const std::string& message, const std::string& event){
+void H4AW_HTTPHandlerSSE::send(const std::string& message, const std::string& event){
     char buf[16];
     std::string rv;
     if(message[0]==':') rv=message+"\n";

@@ -21,7 +21,7 @@ H4 h4(115200);
 H4_TIMER  ticker;
 
 H4AsyncWebServer s(80);
-H4AT_HTTPHandlerWS* _ws=nullptr;
+H4AW_HTTPHandlerWS* _ws=nullptr;
 #define LIB "H4AsyncTCP"
 
 void h4setup(){
@@ -35,8 +35,8 @@ void h4setup(){
   }
   Serial.printf("\nIP: %s\n",WiFi.localIP().toString().c_str());
 
-  _ws=new H4AT_HTTPHandlerWS("/ws");
-  _ws->onOpen([](H4AS_HTTPRequest* skt){
+  _ws=new H4AW_HTTPHandlerWS("/ws");
+  _ws->onOpen([](H4AW_WebsocketClient* skt){
     h4.queueFunction([skt,_ws]{ 
       skt->sendText("lib,%s/%s",LIB,H4AT_VERSION);
       skt->sendText("board,%s",MY_BOARD);
@@ -53,16 +53,16 @@ void h4setup(){
     });
   });
   
-  _ws->onTextMessage([](H4AS_HTTPRequest* skt,const std::string& msg){
+  _ws->onTextMessage([](H4AW_WebsocketClient* skt,const std::string& msg){
     // normally you would parse the message and probably do a big
     // switch statement to perform a different function for each different message type
     // In this simple example, we only have the one type
     skt->sendText(msg+" sent by user");
   });
   
-  _ws->onClose([](H4AS_HTTPRequest* skt){ if(!_ws->size()) h4.cancel(ticker); });
+  _ws->onClose([](H4AW_WebsocketClient* skt){ if(!_ws->size()) h4.cancel(ticker); });
 
-  s.on("/",HTTP_GET,[](H4AT_HTTPHandler* h){ h->sendFile("index.htm"); });   
+  s.on("/",HTTP_GET,[](H4AW_HTTPHandler* h){ h->sendFile("index.htm"); });   
   s.addHandler(_ws);  
   s.begin();
 }

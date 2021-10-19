@@ -44,7 +44,7 @@ H4_INT_MAP http_verb_names = { // tidy
     {HTTP_PATCH,"PATCH"}
 };
 
-H4_INT_MAP H4AT_HTTPHandler::_responseCodes{ // lose this?
+H4_INT_MAP H4AW_HTTPHandler::_responseCodes{ // lose this?
     {100,"Continue"},
     {101,"Switching Protocols"},
     {200,"OK"},
@@ -62,7 +62,7 @@ H4_INT_MAP H4AT_HTTPHandler::_responseCodes{ // lose this?
     {503,"Service Unavailable"}
 };
 
-H4T_NVP_MAP H4AT_HTTPHandler::mimeTypes={
+H4T_NVP_MAP H4AW_HTTPHandler::mimeTypes={
   {"html","text/html"},
   {"htm","text/html"},
   {"css","text/css"},
@@ -74,14 +74,14 @@ H4T_NVP_MAP H4AT_HTTPHandler::mimeTypes={
   {"xml","text/xml"},
 };
 //
-//  H4AS_HTTPRequest
+//  H4AW_HTTPRequest
 //
-std::string H4AS_HTTPRequest::_getHeader(H4T_NVP_MAP& m,const char* h){
+std::string H4AW_HTTPRequest::_getHeader(H4T_NVP_MAP& m,const char* h){
     std::string uh=uppercase(h);
     return m.count(uh) ? m[uh]:"";
 }
 
-void H4AS_HTTPRequest::_paramsFromstring(const std::string& bod){
+void H4AW_HTTPRequest::_paramsFromstring(const std::string& bod){
     std::vector<std::string> prams=split(bod,"&");
     for(auto &p:prams){
         std::vector<std::string> nvp=split(p,"=");
@@ -89,43 +89,39 @@ void H4AS_HTTPRequest::_paramsFromstring(const std::string& bod){
         params[nvp[0]]=urldecode(value);
     }
 }
-
-void H4AS_HTTPRequest::sendText(const std::string& s){ H4AT_HTTPHandlerWS::_sendFrame(this,WS_TEXT,(const uint8_t*) s.data(),s.size()); }
-
-void H4AS_HTTPRequest::sendBinary(const uint8_t* data,size_t len){ H4AT_HTTPHandlerWS::_sendFrame(this,WS_BINARY,data,len); }
 //
-// H4AT_HTTPHandler
+// H4AW_HTTPHandler
 //
-bool H4AT_HTTPHandler::_execute(){
+bool H4AW_HTTPHandler::_execute(){
     if(_f) _f(this);
     return true;
 }
 
-bool H4AT_HTTPHandler::_match(const std::string& verb,const std::string& path){
+bool H4AW_HTTPHandler::_match(const std::string& verb,const std::string& path){
     if(verb==_verbName()){
         if(_path.size() > 1) return path.find(_path,0)==0;
         else return _path==path;
     } else return false;
 }
 
-bool H4AT_HTTPHandler::_notFound(){
+bool H4AW_HTTPHandler::_notFound(){
     send(404,mimeType("txt"),5,"oops!");
     return true;
 }
 
-bool H4AT_HTTPHandler::_select(H4AS_HTTPRequest* r,const std::string& verb,const std::string& path){
+bool H4AW_HTTPHandler::_select(H4AW_HTTPRequest* r,const std::string& verb,const std::string& path){
     _r=r;
     _r->url=urldecode(path);
-    H4AS_PRINT1("Handler select rq=%p url=%s  v=%s[%s] p=%s[%s]\n",_r,_r->url.data(),_verbName().data(),verb.data(),_path.data(),path.data());
+    H4AW_PRINT1("Handler select rq=%p url=%s  v=%s[%s] p=%s[%s]\n",_r,_r->url.data(),_verbName().data(),verb.data(),_path.data(),path.data());
     if(_match(verb,path)){
         bool rv=_execute();
-        reset();
+        _reset();
         return rv;
     } else return false;
 }
 
-bool H4AT_HTTPHandler::_serveFile(const char* fn){
-    H4AS_PRINT2("Serve file %s\n",fn);
+bool H4AW_HTTPHandler::_serveFile(const char* fn){
+    H4AW_PRINT2("Serve file %s\n",fn);
     bool rv=false;
     char crlf[]={'0','\r','\n','\r','\n'};
     size_t force_fit=TCP_MSS - 7; // allow chunk embellishment not to overflow "sensible" buf size hex\r\n ... \r\n == 7
@@ -148,7 +144,7 @@ bool H4AT_HTTPHandler::_serveFile(const char* fn){
             } else _notFound();//send(404,"text/plain",5,"oops!");
         },
         [&]{
-            H4AS_PRINT1("ALL CHUNKED OUT for %s\n",_path.data());
+            H4AW_PRINT1("ALL CHUNKED OUT for %s\n",_path.data());
             _r->TX((const uint8_t*) crlf,5);
             rv=true;
         }
@@ -156,27 +152,27 @@ bool H4AT_HTTPHandler::_serveFile(const char* fn){
     return rv;
 }
 
-std::string H4AT_HTTPHandler::_verbName(){ return http_verb_names[_verb]; }
+std::string H4AW_HTTPHandler::_verbName(){ return http_verb_names[_verb]; }
 
-std::string H4AT_HTTPHandler::mimeType(const char* f){
+std::string H4AW_HTTPHandler::mimeType(const char* f){
     std::string fn(f);
     std::string e = fn.substr(fn.rfind('.')+1);
     return mimeTypes.count(e) ? mimeTypes[e]:"text/plain";
 }
 
-void H4AT_HTTPHandler::redirect(const char* location){
-    H4AS_PRINT1("H4AT_HTTPHandler::redirect -> %s\n",location);
+void H4AW_HTTPHandler::redirect(const char* location){
+    H4AW_PRINT1("H4AW_HTTPHandler::redirect -> %s\n",location);
     addHeader("Location",location);
     send(303,mimeType("txt"),0,nullptr); // tidy this (et al) : no mimetype when length == 0!
 }
 
-void H4AT_HTTPHandler::reset(){
-    H4AS_PRINT1("H4AT_HTTPHandler::reset() 1 %p _r=%p\n",this,_r);
+void H4AW_HTTPHandler::_reset(){
+    H4AW_PRINT1("H4AW_HTTPHandler::reset() 1 %p _r=%p\n",this,_r);
     _headers.clear();
 }
 
-void H4AT_HTTPHandler::send(uint16_t code,const std::string& type,size_t length,const void* _body){
-    H4AS_PRINT2("H4AT_HTTPHandler %p send(%d,%s,%d,%p)\n",this,code,type.data(),length,_body);
+void H4AW_HTTPHandler::send(uint16_t code,const std::string& type,size_t length,const void* _body){
+    H4AW_PRINT2("H4AW_HTTPHandler %p send(%d,%s,%d,%p)\n",this,code,type.data(),length,_body);
     std::string status=std::string("HTTP/1.1 ")+stringFromInt(code,"%3d ").append(_responseCodes[code])+"\r\n";
     _headers["Content-Type"]=type;
     if(length) _headers[txtContentLength()]=stringFromInt(length);
@@ -191,16 +187,16 @@ void H4AT_HTTPHandler::send(uint16_t code,const std::string& type,size_t length,
         if(length) memcpy(buff+h,_body,length);
         _r->TX(buff,total);
         free(buff);
-    } else Serial.printf("AAAAAAAAARGH H4AT_HTTPHandler::send zero buff\n");
+    } else Serial.printf("AAAAAAAAARGH H4AW_HTTPHandler::send zero buff\n");
 }
 
-void H4AT_HTTPHandler::sendFileParams(const char* fn,H4T_FN_LOOKUP f){
+void H4AW_HTTPHandler::sendFileParams(const char* fn,H4T_FN_LOOKUP f){
     sendstring(mimeType(fn), replaceParams(readFile(fn),f));
 }
 //
-// H4AT_HTTPHandlerFile match only verb, treat path as static filename
+// H4AW_HTTPHandlerFile match only verb, treat path as static filename
 //
-bool H4AT_HTTPHandlerFile::_match(const std::string& verb,const std::string& path) {
+bool H4AW_HTTPHandlerFile::_match(const std::string& verb,const std::string& path) {
     _path=path;
     return verb==_verbName();
 }
