@@ -14,7 +14,7 @@
 #include <H4.h>
 H4 h4(115200);
 
-#define DEVICE "SSE_TESTER"
+#define DEVICE "FULL_HOUSE"
   
 #include<H4AsyncWebServer.h>
 #include<DiscardServer.h>
@@ -28,10 +28,9 @@ RandomQuoteServer rqs(8017);
 
 H4AW_HTTPHandlerSSE* _evts=nullptr;
 #define LIB "H4AsyncTCP"
-H4AT_NVP_MAP replacers={
+H4T_NVP_MAP lookup={
     {"device",DEVICE}
 };
-H4T_FN_LOOKUP lookup=[](const std::string& n){ return replacers.count(n) ? replacers[n]:"%"+n+"%"; };
 
 #define UI_UPDATER 42
 
@@ -85,7 +84,7 @@ void h4setup(){
   });
 
   s.on("/",HTTP_GET,[](H4AW_HTTPHandler* h){
-    h->sendFileParams("/sta.htm",lookup); // refac
+    h->sendFileParams("/sta.htm",lookup);
   });   
 
   s.addHandler(_evts);

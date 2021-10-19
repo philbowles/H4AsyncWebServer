@@ -41,10 +41,9 @@ It's an asynchronous webserver for ESP8266 and ESP32 supporting websockets and S
 
 ***H4AsyncWebServer is NOT a "drop-in" replacement for ESPAsyncWebServer***
 
-It is almost impossible to discuss `H4AsyncWebServer` without reference to the `ESPAsyncWebServer` library, but I shall keep it to the bare minimum. `H4AsyncWebServer` only exists because of the serious bugs, faulty / broken implementations of SSE, websockets and nigh-on total lack of support in `ESPAsyncWebServer`. 
+It is almost impossible to discuss `H4AsyncWebServer` without reference to the `ESPAsyncWebServer` library: `H4AsyncWebServer` only exists because of the serious bugs, faulty / broken implementations of SSE, websockets and nigh-on total lack of support in `ESPAsyncWebServer`. 
 
-
-`H4AsyncWebServer` was written specifically to workaround these long-standing unresolved major issues in `ESPAsyncWebServer` that contribute to the instability of any ESP app using it and its subsequent total lack of suitability for use in robust apps.
+`H4AsyncWebServer` was written specifically to avoid these long-standing unresolved major issues in `ESPAsyncWebServer`. They are issues that contribute to the instability of any ESP app using it and its subsequent total lack of suitability for use in robust apps.
 
 ## Main reason for differences
 
@@ -56,9 +55,9 @@ It is almost impossible to discuss `H4AsyncWebServer` without reference to the `
 
 * `H4AsyncWebServer`'s primary goal was to support the H4 "family" of apps, so only features that are required by those other H4 libraries are present
 
-Some authors may take the view that propagating the illogical/incorrect/wrong-level/broken API to a replacement libary is a "GOOD THING" to reduce user refactoring etc and make direct "drop-in" possible. This author is not one of those, thus you will need to make many changes to any existing codebase if you want to replace `ESPAsyncWebServer` with `H4AsyncWebServer`. (*But at least it might not then crash quite as often* :smile: )
+Some authors may take the view that propagating the illogical/incorrect/wrong-level/broken API to a replacement library is a "GOOD THING" to reduce user refactoring etc and make direct "drop-in" possible. This author is not one of those, so you will need to make many changes to any existing codebase if you want to replace `ESPAsyncWebServer` with `H4AsyncWebServer`. (*But at least it might not then crash quite as often* :smile: and will probably be a lot shorter, more legible and make more sense)
 
-Any "missing" feature can be added easily enough if a user can make a solid case for it and this author is happy to add whatever other features make the library more applicable outside the H4 family.
+Any "missing" feature can be added easily enough if you can make a solid case for it. One-offs and rare edge cases won't "cut the mustard". I'm happy to add whatever other features make the library more applicable outside the H4 family.
 
 ---
 
@@ -248,17 +247,43 @@ H4AW_HTTPRequest* client() // ptr to original request (base is H4AsyncClient) al
 std::string mimeType(const char* fn); // returns mime type of file / file extention e.g. fn can be "myfile.xyz" or just "xyz"
 H4T_NVP_MAP& params()// name/value pair map of input parameters either from ? query string or POST body
 void redirect(const char* url); // Send HTTP 303 redirect to new url
-void reset(); // should not be called by user
+// send(...
 // code = HTTP code
 // type =MIME type of reply: either type returned from mimeType or literal e.g. "text/plain"
 // length of body data
 // _body = address of body data
 void send(uint16_t code,const std::string& type,size_t length=0,const void* _body=nullptr);
 void sendFile(const char* fn) // server file from FS
-void sendFileParams(const char* fn,H4T_FN_LOOKUP f);
+void sendFileParams(const char* fn,H4T_FN_LOOKUP f); // allows paramtere replacements: see below
 void sendOK(); // reurn HTTP 200 OK
-void sendstring(const std::string& type,const std::string& data){ send(200,type,data.size(),(const void*) data.data()); }
+void sendstring(const std::string& type,const std::string& data); // does what it says on the tin
 std::string url(); // returns full URL of request
+```
+
+### Parameter replacement
+
+`sendFileParams` allows for run-time parameter replacements. It expects that the file `fn` contains parameters of the form `%param1%`, e.g.
+
+```html
+...
+<title>%mytitle%</title>
+...
+```
+
+Somewhere in your code you will have a name/value pair map, e.g.:
+
+```cpp
+H4AT_NVP_MAP replacers={
+    {"mytitle","H4 ASYNC WEBSERVER HOME PAGE"},
+    {"chipid","F4EA91"},
+    ...
+};
+```
+
+To link it all together we need a function that takes the parameter name and looks it up in the table, returning its value to be "stitched in" to the web page before delivery to the browser, e.g.
+
+```cpp
+H4T_FN_LOOKUP lookup=[](const std::string& n){ return replacers.count(n) ? replacers[n]:"%"+n+"%"; };
 ```
 
 ## H4AW_HTTPHandlerWS (websocket) API

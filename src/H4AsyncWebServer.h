@@ -173,7 +173,8 @@ class H4AW_HTTPHandler {
                 void                redirect(const char* fn);
         virtual void                send(uint16_t code,const std::string& type,size_t length=0,const void* body=nullptr);
         virtual void                sendFile(const char* fn){ _serveFile(fn); }
-        virtual void                sendFileParams(const char* fn,H4T_FN_LOOKUP f);
+        //virtual void                sendFileParams(const char* fn,H4T_FN_LOOKUP f);
+        virtual void                sendFileParams(const char* fn,H4T_NVP_MAP& nvp);
                 void                sendOK(){ send(200,mimeType("txt"),0,nullptr); }
                 // send404?
         virtual void                sendstring(const std::string& type,const std::string& data){ send(200,type,data.size(),(const void*) data.data()); }

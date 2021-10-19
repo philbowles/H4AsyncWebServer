@@ -43,36 +43,21 @@ input[type="image"]{ outline:none; }
 }
 
 #shang {
-    background-image: url(8266.jpg);
-    background-repeat: no-repeat;
-    background-position: center;
     background-color: #ececec;
 }
 #thang {
-    background-image: url(h4sml.jpg);
-    background-repeat: no-repeat;
-    background-position: center;
     background-color: aliceblue;
 }
 #uhang {
     background-color:honeydew;
 }
 #mhang{ 
-    background-image: url(pango.jpg);
-    background-repeat: no-repeat;
-    background-position: center;
     background-color: beige;
 }
 #ghang{ 
-    background-image: url(pink0.jpg);
-    background-repeat: no-repeat;
-    background-position: center;
     background-color: #ffc0cb47;
 }
 #hhang{ 
-    background-image: url(health.jpg);
-    background-repeat: no-repeat;
-    background-position: center;
     background-color: white;
 }
 #cc{ 

@@ -189,9 +189,13 @@ void H4AW_HTTPHandler::send(uint16_t code,const std::string& type,size_t length,
         free(buff);
     } else Serial.printf("AAAAAAAAARGH H4AW_HTTPHandler::send zero buff\n");
 }
-
+/*
 void H4AW_HTTPHandler::sendFileParams(const char* fn,H4T_FN_LOOKUP f){
     sendstring(mimeType(fn), replaceParams(readFile(fn),f));
+}
+*/
+void H4AW_HTTPHandler::sendFileParams(const char* fn,H4T_NVP_MAP& nvp){
+    sendstring(mimeType(fn), replaceParams(readFile(fn),nvp));
 }
 //
 // H4AW_HTTPHandlerFile match only verb, treat path as static filename
