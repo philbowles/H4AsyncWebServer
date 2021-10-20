@@ -54,14 +54,10 @@ void h4setup(){
   });
   
   _ws->onTextMessage([](H4AW_WebsocketClient* skt,const std::string& msg){
-    // normally you would parse the message and probably do a big
-    // switch statement to perform a different function for each different message type
-    // In this simple example, we only have the one type
     skt->sendText(msg+" sent by user");
   });
   
   _ws->onClose([](H4AW_WebsocketClient* skt){ if(!_ws->size()) h4.cancel(ticker); });
-
   s.on("/",HTTP_GET,[](H4AW_HTTPHandler* h){ h->sendFile("index.htm"); });   
   s.addHandler(_ws);  
   s.begin();

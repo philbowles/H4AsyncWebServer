@@ -224,7 +224,7 @@ Given the nature of the "startswith" path matching, two important points arise:
 
 ```cpp
 // callbacks
-void myHandlerFunction(H4AW_HTTPHandler*)
+void myHandlerFunction(H4AW_HTTPHandler*);
 // constructor
 H4AsyncWebServer(uint16_t port,size_t cacheAge=H4AW_CACHE_AGE);
 //
@@ -254,7 +254,7 @@ void redirect(const char* url); // Send HTTP 303 redirect to new url
 // _body = address of body data
 void send(uint16_t code,const std::string& type,size_t length=0,const void* _body=nullptr);
 void sendFile(const char* fn) // server file from FS
-void sendFileParams(const char* fn,H4T_FN_LOOKUP f); // allows paramtere replacements: see below
+void sendFileParams(const char* fn,,H4T_NVP_MAP& nvp); // allows paramtere replacements: see below
 void sendOK(); // reurn HTTP 200 OK
 void sendstring(const std::string& type,const std::string& data); // does what it says on the tin
 std::string url(); // returns full URL of request
@@ -273,63 +273,83 @@ std::string url(); // returns full URL of request
 Somewhere in your code you will have a name/value pair map, e.g.:
 
 ```cpp
-H4AT_NVP_MAP replacers={
+H4AT_NVP_MAP nvp={
     {"mytitle","H4 ASYNC WEBSERVER HOME PAGE"},
     {"chipid","F4EA91"},
     ...
 };
 ```
-
-To link it all together we need a function that takes the parameter name and looks it up in the table, returning its value to be "stitched in" to the web page before delivery to the browser, e.g.
-
-```cpp
-H4T_FN_LOOKUP lookup=[](const std::string& n){ return replacers.count(n) ? replacers[n]:"%"+n+"%"; };
-```
-
 ## H4AW_HTTPHandlerWS (websocket) API
 
 This is not a full implementation: sub-protocols are not supported
 
 ```cpp
 // callbacks
-// H4AW_HTTPRequest* skt is a pointer to the raw websocket object
-void mySocketOpen(H4AW_HTTPRequest* skt);
-void mySocketClose(H4AW_HTTPRequest* skt);
-void mySocketTextMessageReceived(H4AW_HTTPRequest* skt,const std::string& msg);
-void mySocketBinaryMessageReceived(H4AW_HTTPRequest*,const uint8_t* data,size_t length);
+// H4AW_WebsocketClient* skt is a pointer to the raw websocket object
+void mySocketOpen(H4AW_WebsocketClient* skt);
+void mySocketClose(H4AW_WebsocketClient* skt);
+void mySocketTextMessageReceived(H4AW_WebsocketClient* skt,const std::string& msg);
+void mySocketBinaryMessageReceived(H4AW_WebsocketClient*,const uint8_t* data,size_t length);
 //
 // constructor
 H4AW_HTTPHandlerWS(const std::string& url); // url=path used inside javascript websocket, e.g. "/ws" or "/mysocket"
 //
 void broadcastBinary(const uint8_t* data,size_t len); // send binary websocket msg to all clients
-template<typename... Args>
 void broadcastText(const char* fmt, Args... args); // printf-style format,a,b,c... etc text message to all clients
 void onBinaryMessage(H4AW_FN_WSBIN mySocketBinaryMessageReceived); // define binary socket message RX handler
 void onClose(H4AW_FN_WSEVENT mySocketClose); // define socket client gone away handler
  void onOpen(H4AW_FN_WSEVENT mySocketOpen); // define new socket client handler
  void onTextMessage(H4AW_FN_WSTXT cb); // define text socket message RX handler
- void reset() override; // don't call this!
  size_t size(); // returns number of socket clients
 ```
 
+### Notes
+
+The `onOpen` callback is usually used to start any processes that will be handling socket messages, e.g. updating the UI. This should only be done once, i.e. when `skt->size()` returns 1 meaning that at least one UI browser is now open.
+
+The `onClose` callback is usually used to stop any processes that will be handling socket messages if `skt->size()` returns 0, meaning there are no longer any UI clients. 
+
 [Example sketch](examples/websocket_tester/websocket_tester.ino)
+
+## H4AW_WebsocketClient API
+
+```cpp
+// constructor is never called by the user
+//
+void sendBinary(const uint8_t* data,size_t len); // binary message to this socket only
+void sendText(const char*,Args&&...); // printf-style format,a,b,c... etc text message to this socket only
+void sendText(const std::string& s); // plain text to this socket only
+```
 
 ## H4AW_HTTPHandlerSSE (Server-Sent Events) API
 
+### Introduction
+
+Server-Sent Events are a "push" protocol: you can think of SSE as similar to a "one-way" websocket. They can also be thought of as similar to a webpage subscribing to a topic in MQTT, but for HTTP messages. Your server the does the equivalnet of an MQTT "publish" whenever it has new data.
+
+A client registers its interest in a given type of SSE message and will then receive SSE messages asynchronously whenever the server decides to send them. One of the features of the protocol is that the client will automatically re-connect if there is a break in service. This allows the server to re-transmit any messages the client may have missed, providing - of course - that the server has kept a copy (known as the "backlog").
+
+Maintaining a backlog is optional, it depends entirely on your app and how critical it is to "miss" a message and - to some extent - how reliable your network is in a tradeoff between speed / size, as the backlog will take up valuable heap space. Many apps work perfectly well with no backlog at all if the UI is updated frequently.
+
+Either way, the process is automatic and invisble to the user: he/she just blasts messages into space while ever there are listening clients, safe in the knowledge they will be kept up-to-date.
+
+
 ```cpp
 //callbacks
-void newSocketClient(size_t n); // n = number of SSE clients
+void clientsChange(size_t n); // n = number of SSE clients NB can be zero, meaning all browsers closed
 // constructor
 // url=path used inside javascript websocket, e.g. "/event" or "/sse"
 // backlog = number of messages to keep (cyclic buffer of last n) for retransmission after client reconnect
 H4AW_HTTPHandlerSSE(const std::string& url,size_t backlog=0);
 //
-void onConnect(H4AW_EVT_HANDLER cb){ _cbConnect=cb; }
-void reset() override; // dont call this
-void saveBacklog(const std::string& msg); // dont call this
-void send(const std::string& message, const std::string& event="");
+void onChange(H4AW_EVT_HANDLER clientsChange); // declare new client / client close handler
+void send(const std::string& message, const std::string& event=""); // send to all clients
 size_t size(); // returns number of  SSE clients
 ```
+
+### Notes
+
+Since all clients gets the same events, the server only needs to know if it has any clients, so the `onChange` callback occurs when any clients join or leave. It is common to start any processes that will be sending SSE messages, e.g. updating the UI when `nClients` changes from 0 to 1 meaning that at least one UI browser is now open. Similarly it is common to stop those processes when `nClients` returns 0, meaning there are no longer any UI clients. 
 
 [Example sketch](examples/sse_tester/sse_tester.ino)
 

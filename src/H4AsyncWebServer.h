@@ -105,11 +105,6 @@ class H4AW_HTTPRequest: public H4AsyncClient {
         static  std::string     _getHeader(H4T_NVP_MAP& m,const char* h);
                 void            _paramsFromstring(const std::string& bod);
 };
-class H4AW_SSEClient: public H4AW_HTTPRequest {
-    public:
-        H4AW_SSEClient(tcp_pcb* p): H4AW_HTTPRequest(p){}
-        virtual ~H4AW_SSEClient(){}
-};
 
 class H4AW_WebsocketClient: public H4AW_HTTPRequest {
     public:
@@ -147,13 +142,11 @@ class H4AW_HTTPHandler {
 
     public:
                 H4T_NVP_MAP         _headers; // hoist!
-                H4AsyncWebServer*   _srv;
-
-                std::string         _verbName();
-                int                 _verb;
                 std::string         _path;
                 H4AW_HTTPRequest*   _r=nullptr;
                 H4T_NVP_MAP         _sniffHeader; // thinl: tidy??
+                H4AsyncWebServer*   _srv;
+                int                 _verb;
 
         static  H4T_NVP_MAP         mimeTypes;
 
@@ -173,10 +166,8 @@ class H4AW_HTTPHandler {
                 void                redirect(const char* fn);
         virtual void                send(uint16_t code,const std::string& type,size_t length=0,const void* body=nullptr);
         virtual void                sendFile(const char* fn){ _serveFile(fn); }
-        //virtual void                sendFileParams(const char* fn,H4T_FN_LOOKUP f);
         virtual void                sendFileParams(const char* fn,H4T_NVP_MAP& nvp);
                 void                sendOK(){ send(200,mimeType("txt"),0,nullptr); }
-                // send404?
         virtual void                sendstring(const std::string& type,const std::string& data){ send(200,type,data.size(),(const void*) data.data()); }
                 std::string         url(){ return _r->url; } // tidy these
 //      don't call
@@ -185,6 +176,7 @@ class H4AW_HTTPHandler {
         virtual void                _reset();
                 bool                _select(H4AW_HTTPRequest* r,const std::string& verb,const std::string& path);
                 bool                _serveFile(const char* fn);
+                std::string         _verbName();
 };
 
 class H4AW_HTTPHandlerFile: public H4AW_HTTPHandler {
@@ -213,16 +205,14 @@ class H4AW_HTTPHandlerSSE: public H4AW_HTTPHandler {
             H4AW_EVT_HANDLER                    _cbConnect;
             std::map<size_t,std::string>        _backlog;
             size_t                              _bs;
+            size_t                              _nextID=0;
     protected:
         virtual bool                _execute() override;
     public:
-            size_t                              _nextID=0;
-
         H4AW_HTTPHandlerSSE(const std::string& url,size_t backlog=0);
         ~H4AW_HTTPHandlerSSE();
 
-                void                onConnect(H4AW_EVT_HANDLER cb){ _cbConnect=cb; }
-        virtual void                saveBacklog(const std::string& msg);
+                void                onChange(H4AW_EVT_HANDLER cb){ _cbConnect=cb; }
                 void                send(const std::string& message, const std::string& event="");
                 size_t              size(){ return _clients.size(); }
 //      don't call
@@ -243,7 +233,7 @@ class H4AW_HTTPHandlerWS: public H4AW_HTTPHandler {
 
                 void                 _socketMessage(H4AW_WebsocketClient* r,const uint8_t* data,uint16_t len);
     protected:
-        virtual bool                _execute() override;
+        virtual bool                 _execute() override;
     public:
 
         H4AW_HTTPHandlerWS(const std::string& url);

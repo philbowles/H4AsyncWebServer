@@ -20,10 +20,9 @@ H4 h4(115200);
 H4AsyncWebServer s(80);
 H4AW_HTTPHandlerSSE* _evts=nullptr;
 #define LIB "H4AsyncTCP"
-H4AT_NVP_MAP replacers={
+H4AT_NVP_MAP lookup={
     {"device",DEVICE}
 };
-H4T_FN_LOOKUP lookup=[](const std::string& n){ return replacers.count(n) ? replacers[n]:"%"+n+"%"; };
 
 #define UI_UPDATER 42
 
@@ -43,8 +42,8 @@ void h4setup(){
   Serial.printf("Cry 'Havoc!' and let receive the packets of War!\n\n");
 
   _evts=new H4AW_HTTPHandlerSSE("/evt");//,10); // backlog = 10
-  _evts->onConnect([=](size_t nClients){
-      Serial.printf("_evts->onConnect N=%d\n",nClients);
+  _evts->onChange([=](size_t nClients){
+      Serial.printf("_evts->onChange N=%d\n",nClients);
       if(nClients){
         // do setup stuff, start timers etc
         h4.every(500,[=]{
@@ -54,13 +53,12 @@ void h4setup(){
           _evts->send(stringFromInt(_HAL_maxHeapBlock()).data(),"maxblock");
           _evts->send(stringFromInt(led).data(),"LED");led=!led;
         },nullptr,UI_UPDATER,true);
-        
         // send UI seup stuff
         // statics
-        _evts->send("library,0,s,0,0,"LIB,"ui");
-        _evts->send("device,0,s,0,0,"DEVICE,"ui");
+        _evts->send("library,0,s,0,0," LIB,"ui");
+        _evts->send("device,0,s,0,0," DEVICE,"ui");
         _evts->send((std::string("chip,0,s,0,0,")+_HAL_uniqueName("ESP_")).data(),"ui");
-        _evts->send("board,0,s,0,0,"MY_BOARD,"ui");
+        _evts->send("board,0,s,0,0," MY_BOARD,"ui");
         _evts->send("Son1,0,s,0,0,Huey","ui");
         _evts->send("Son2,0,s,0,0,Louie","ui");
         _evts->send("Son3,0,s,0,0,Dewey","ui");

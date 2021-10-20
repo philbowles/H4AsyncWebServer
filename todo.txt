@@ -1,3 +1,2 @@
-release notes for H4T, H4AT
 tidy / remove data folders for examples
 rejig existing README to match class name changes... + finish
